@@ -55,7 +55,7 @@ export async function fetchNews(symbols: string[]): Promise<NewsItem[]> {
       url: article.url ?? "",
       source: article.source ?? "",
       sentiment: sentiment as "positive" | "negative" | "neutral",
-      relatedSymbols: [...new Set(relatedSymbols)],
+      relatedSymbols: [...new Set<string>(relatedSymbols)],
       publishedAt: article.published_at ?? "",
     };
   });

@@ -53,10 +53,10 @@ export async function generateBriefing(
  * 流式 Chat 响应
  * 返回 AsyncIterable
  */
-export function streamChat(
+export async function streamChat(
   messages: ChatMessage[],
   briefingContext: BriefingInput
-): AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> {
+): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
   const client = getClient();
 
   const systemMessage = CHAT_SYSTEM_PROMPT + JSON.stringify(briefingContext, null, 2);

@@ -9,9 +9,7 @@ import { fetchEarningsCalendar } from "@/lib/finnhub";
 import { getMarketStatus } from "@/lib/market-status";
 import { assembleBriefingInput } from "@/lib/briefing-pipeline";
 import { generateBriefing } from "@/lib/openai";
-import { REVALIDATE } from "@/lib/constants";
-
-export const revalidate = REVALIDATE.LOW_FREQ;
+export const revalidate = 86400; // LOW_FREQ: 24 hours
 
 /**
  * GET /api/briefing?symbols=INTC,NVDA,GOOGL

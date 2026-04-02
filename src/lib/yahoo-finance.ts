@@ -1,7 +1,9 @@
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
 import { IndexData, StockQuote } from "./types";
 import { INDEX_SYMBOLS, VIX_THRESHOLDS } from "./constants";
 import { VixData } from "./types";
+
+const yahooFinance = new YahooFinance();
 
 /**
  * 从 Yahoo Finance 批量获取指数数据

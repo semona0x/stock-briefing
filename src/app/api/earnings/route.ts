@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchEarningsCalendar } from "@/lib/finnhub";
-import { REVALIDATE } from "@/lib/constants";
-
-export const revalidate = REVALIDATE.LOW_FREQ;
+export const revalidate = 86400; // LOW_FREQ: 24 hours
 
 export async function GET(request: NextRequest) {
   const symbolsParam = request.nextUrl.searchParams.get("symbols") ?? "";

@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchIndices } from "@/lib/yahoo-finance";
 import { fetchIndicesFMP } from "@/lib/fmp";
-import { REVALIDATE } from "@/lib/constants";
-
-export const revalidate = REVALIDATE.HIGH_FREQ;
+export const revalidate = 300; // HIGH_FREQ: 5 minutes
 
 /**
  * GET /api/indices

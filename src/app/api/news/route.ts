@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchNews } from "@/lib/marketaux";
-import { REVALIDATE } from "@/lib/constants";
-
-export const revalidate = REVALIDATE.MID_FREQ;
+export const revalidate = 1800; // MID_FREQ: 30 minutes
 
 export async function GET(request: NextRequest) {
   const symbolsParam = request.nextUrl.searchParams.get("symbols") ?? "";

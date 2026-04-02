@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchQuotes } from "@/lib/yahoo-finance";
 import { fetchQuotesFMP } from "@/lib/fmp";
-import { REVALIDATE } from "@/lib/constants";
-
-export const revalidate = REVALIDATE.HIGH_FREQ;
+export const revalidate = 300; // HIGH_FREQ: 5 minutes
 
 /**
  * GET /api/quotes?symbols=INTC,NVDA,GOOGL
