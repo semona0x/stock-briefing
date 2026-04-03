@@ -78,6 +78,14 @@ export async function GET(request: NextRequest) {
   const symbolsParam = request.nextUrl.searchParams.get("symbols") ?? "";
   const symbols = symbolsParam.split(",").filter(Boolean).map((s) => s.trim().toUpperCase());
   const force = request.nextUrl.searchParams.get("force") === "true";
+  const testDateParam = request.nextUrl.searchParams.get("testDate");
+
+  // testDate only allowed in development
+  if (testDateParam && process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: "testDate only available in development" }, { status: 403 });
+  }
+
+  const testDate = testDateParam && /^\d{4}-\d{2}-\d{2}$/.test(testDateParam) ? testDateParam : null;
 
   if (symbols.length === 0) {
     return NextResponse.json({
@@ -88,11 +96,13 @@ export async function GET(request: NextRequest) {
   }
 
   const { date: tradingDay } = getLastTradingDay();
+  const effectiveDate = testDate ?? tradingDay;
   // 包含交易日日期的缓存键，保证每天自动失效
-  const symbolsKey = `${tradingDay}:${[...symbols].sort().join(",")}`;
+  const symbolsKey = `${effectiveDate}:${[...symbols].sort().join(",")}`;
 
   try {
-    const data = force ? await runGeneration(symbolsKey) : await getCachedBriefing(symbolsKey);
+    // testDate 和 force 都跳过缓存
+    const data = (force || testDate) ? await runGeneration(symbolsKey) : await getCachedBriefing(symbolsKey);
     console.log(`[Briefing] Serving for ${symbolsKey}, generated at ${data.generatedAt}`);
 
     return NextResponse.json({

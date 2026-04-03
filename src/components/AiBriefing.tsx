@@ -97,7 +97,7 @@ export default function AiBriefing({ symbols, symbolsReady, onBriefingLoaded }: 
   const [data, setData] = useState<BriefingResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [loadingStep, setLoadingStep] = useState("正在获取市场数据...");
+  const [loadingStep] = useState("正在生成今日简报...");
   const [refreshing, setRefreshing] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -130,12 +130,9 @@ export default function AiBriefing({ symbols, symbolsReady, onBriefingLoaded }: 
       setRefreshing(true);
     } else {
       setLoading(true);
-      setLoadingStep("正在获取市场数据...");
     }
 
-    const timer = force
-      ? null
-      : setTimeout(() => setLoadingStep("正在生成简报..."), 3000);
+
 
     fetch(url)
       .then((res) => res.json())
@@ -148,7 +145,6 @@ export default function AiBriefing({ symbols, symbolsReady, onBriefingLoaded }: 
       })
       .catch(() => setError("简报生成失败"))
       .finally(() => {
-        if (timer) clearTimeout(timer);
         if (force) {
           setRefreshing(false);
           startCooldown();

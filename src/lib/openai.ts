@@ -27,12 +27,33 @@ CNBC、SEC官网、公司IR页面
 MIT Technology Review
 不引用：社交媒体、匿名博客、加密货币网站、低质量聚合站
 
-像经验丰富的交易员跟朋友聊天那样说话，简洁、有判断、不堆术语。`;
+像经验丰富的交易员跟朋友聊天那样说话，简洁、有判断、不堆术语。
+
+禁止在输出开头添加任何问候语或标题介绍句，
+如"温先生，以下是..."，直接从第一部分开始输出。
+禁止在输出末尾添加任何结尾语，如"以上是今日的市场简报"。`;
 
 /** Chat 系统 prompt 模板 */
 const CHAT_SYSTEM_PROMPT = `你是温先生的私人美股助理。以下是今天的市场数据摘要，请基于这些数据回答温先生的问题。
 语气亲切但专业，称呼用「温先生」。回答简洁实用。不要使用 markdown 格式，输出纯文字。
 如果问题超出今日市场数据范围，直接告知温先生目前没有相关数据，建议查阅最新资讯，不要猜测或编造答案。
+
+当用户用中文提问时，你需要：
+1. 理解用户的中文问题
+2. 用英文搜索最新的美国市场信息（搜索词使用英文）
+3. 基于英文搜索结果，用中文回答用户的问题
+4. 回答中不要包含任何链接或URL
+
+这样温先生可以用中文提问，但你会搜索英文来源获取最准确的美国市场信息，然后翻译成中文回答。
+
+搜索时优先参考以下权威来源：
+Reuters、Bloomberg、WSJ、Financial Times、Barron's、
+CNBC、SEC官网、公司官方IR页面、Seeking Alpha、Morningstar
+
+但不限于以上来源，你可以自由搜索任何可信的英文来源。
+判断来源可信度的标准：有署名作者、有发布日期、有明确的机构背景。
+回答必须用中文，不得包含任何链接、网址或域名。
+禁止引用内容农场、无署名博客、加密货币炒作网站。
 
 今日市场数据：
 `;
@@ -44,6 +65,12 @@ function cleanBriefing(raw: string): string {
     .replace(/^#+\s/gm, '')                        // 删除标题符号
     .replace(/^[-*]\s/gm, '')                      // 删除列表符号（- 和 * 开头）
     .replace(/`/g, '')                             // 删除代码符号
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')         // markdown 链接 → 保留文字
+    .replace(/\([^)]*https?:\/\/[^)]*\)/g, '')      // 删除括号内裸 URL
+    .replace(/https?:\/\/\S+/g, '')                 // 删除裸 URL
+    .replace(/\*\s+/g, '')                          // 删除孤立星号加空格
+    .replace(/以上是今日的市场简报。?/g, '')           // 删除结尾语
+    .replace(/温先生，以下是[^。]*。?/g, '')          // 删除开头问候语
     .replace(/今日无显著动态。?/g, '')               // 删除占位语
     .replace(/暂无相关消息。?/g, '')
     .replace(/今天没有[^。]*动态。?/g, '')
@@ -128,7 +155,7 @@ AI与云计算：当日重要动态
 价格以上方Yahoo Finance数据为准`;
 
   const completion = await client.chat.completions.create({
-    model: "gpt-4o-search-preview",
+    model: "gpt-5-search-api",
     messages: [
       { role: "system", content: BRIEFING_SYSTEM_PROMPT },
       { role: "user", content: userMessage },
@@ -153,17 +180,26 @@ AI与云计算：当日重要动态
  */
 export async function streamChat(
   messages: ChatMessage[],
-  briefingContext: BriefingInput
+  briefingContext: BriefingInput,
+  englishQuery?: string
 ): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
   const client = getClient();
 
   const systemMessage = CHAT_SYSTEM_PROMPT + JSON.stringify(briefingContext, null, 2);
 
+  // If an English translation is provided, replace the last user message with it
+  const apiMessages = englishQuery
+    ? [
+        ...messages.slice(0, -1).map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        { role: "user" as const, content: englishQuery },
+      ]
+    : messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
   return client.chat.completions.create({
-    model: "gpt-4o-search-preview",
+    model: "gpt-5-search-api",
     messages: [
       { role: "system", content: systemMessage },
-      ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      ...apiMessages,
     ],
     max_tokens: 800,
     stream: true,
