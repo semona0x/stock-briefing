@@ -17,7 +17,7 @@ export default function Header() {
   }, []);
 
   if (!mounted) {
-    return <header className="px-8 py-6 divider-double" />;
+    return <header className="px-4 md:px-8 py-6 divider-double" />;
   }
 
   // 北京时间问候
@@ -45,10 +45,10 @@ export default function Header() {
   const statusDisplay = getMarketStatusDisplay(status);
 
   return (
-    <header className="px-8 py-6 divider-double">
+    <header className="px-4 md:px-8 py-6 divider-double">
       <div className="max-w-7xl mx-auto flex items-baseline justify-between">
         <div>
-          <h1 className="font-serif-cn text-3xl font-bold text-ink">
+          <h1 className="font-serif-cn text-2xl md:text-3xl font-bold text-ink">
             温先生，{greeting}
           </h1>
           <p className="text-ink-muted mt-1">{dateStr}</p>

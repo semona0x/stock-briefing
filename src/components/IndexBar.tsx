@@ -31,10 +31,12 @@ export default function IndexBar() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-6 gap-3 px-8 py-4 max-w-7xl mx-auto">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-paper-dark rounded-lg p-3 animate-pulse h-20" />
-        ))}
+      <div className="overflow-x-auto px-4 md:px-8 py-4">
+        <div className="flex gap-3 md:grid md:grid-cols-6 max-w-7xl md:mx-auto" style={{ minWidth: "max-content" }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-paper-dark rounded-lg p-3 animate-pulse h-20 w-36 md:w-auto shrink-0 md:shrink" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -70,11 +72,12 @@ export default function IndexBar() {
   ];
 
   return (
-    <div className="grid grid-cols-6 gap-3 px-8 py-4 max-w-7xl mx-auto">
+    <div className="overflow-x-auto px-4 md:px-8 py-4">
+      <div className="flex gap-3 md:grid md:grid-cols-6 max-w-7xl md:mx-auto" style={{ minWidth: "max-content" }}>
       {cards.map((card) => (
         <div
           key={card.name}
-          className="bg-paper-dark rounded-lg p-3 border border-divider"
+          className="bg-paper-dark rounded-lg p-3 border border-divider w-36 md:w-auto shrink-0 md:shrink"
         >
           <p className="text-xs text-ink-muted truncate">{card.name}</p>
           <p className="text-lg font-bold font-serif-cn mt-1">{card.value}</p>
@@ -101,6 +104,7 @@ export default function IndexBar() {
           )}
         </div>
       ))}
+      </div>
     </div>
   );
 }

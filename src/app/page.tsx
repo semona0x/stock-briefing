@@ -21,14 +21,6 @@ export default function Home() {
     setBriefingContext(input);
   }, []);
 
-  if (!loaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-ink-muted">加载中...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen">
       {/* 顶部 Header */}
@@ -37,9 +29,9 @@ export default function Home() {
       {/* 指数栏 */}
       <IndexBar />
 
-      {/* 主体两栏 */}
-      <div className="max-w-7xl mx-auto px-8 py-6">
-        <div className="flex gap-8">
+      {/* 主体：移动端单列，桌面端两栏 */}
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
+        <div className="flex flex-col md:flex-row gap-6 md:gap-8">
           {/* 左栏：主信息 */}
           <div className="flex-1 min-w-0">
             {/* 自选股 */}
@@ -48,9 +40,10 @@ export default function Home() {
               onEditClick={() => setEditorOpen(true)}
             />
 
-            {/* AI 简报 */}
+            {/* AI 简报：等 symbols 从 localStorage 确认后再发起请求 */}
             <AiBriefing
               symbols={symbols}
+              symbolsReady={loaded}
               onBriefingLoaded={handleBriefingLoaded}
             />
 
@@ -58,8 +51,8 @@ export default function Home() {
             <NewsList symbols={symbols} />
           </div>
 
-          {/* 右栏：工具 */}
-          <div className="w-[380px] shrink-0 space-y-6">
+          {/* 右栏：工具（移动端跟在新闻后面，桌面端固定宽度） */}
+          <div className="md:w-[380px] md:shrink-0 space-y-6">
             {/* AI Chat */}
             <ChatBox briefingContext={briefingContext} />
 

@@ -12,11 +12,30 @@ interface ChatBoxProps {
 export default function ChatBox({ briefingContext }: ChatBoxProps) {
   const { messages, isStreaming, sendMessage } = useChat(briefingContext);
   const [input, setInput] = useState("");
+  const [keyboardPadding, setKeyboardPadding] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // 移动端键盘弹出时，用 visualViewport 计算需要上移的高度
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const onResize = () => {
+      const bottomGap = window.innerHeight - vv.height - vv.offsetTop;
+      setKeyboardPadding(bottomGap > 0 ? bottomGap : 0);
+    };
+
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", onResize);
+    return () => {
+      vv.removeEventListener("resize", onResize);
+      vv.removeEventListener("scroll", onResize);
+    };
+  }, []);
 
   const handleSend = () => {
     const text = input.trim();
@@ -31,7 +50,10 @@ export default function ChatBox({ briefingContext }: ChatBoxProps) {
   };
 
   return (
-    <div className="border border-divider rounded-lg bg-white flex flex-col h-[500px]">
+    <div
+      className="border border-divider rounded-lg bg-white flex flex-col h-[500px]"
+      style={{ paddingBottom: keyboardPadding }}
+    >
       <div className="px-4 py-3 border-b border-divider">
         <h3 className="font-serif-cn font-bold">智能问答</h3>
       </div>

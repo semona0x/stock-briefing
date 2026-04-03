@@ -9,16 +9,20 @@ interface BriefingResponse extends BriefingData {
 
 interface AiBriefingProps {
   symbols: string[];
+  symbolsReady: boolean;
   onBriefingLoaded: (briefingInput: BriefingInput) => void;
 }
 
-export default function AiBriefing({ symbols, onBriefingLoaded }: AiBriefingProps) {
+export default function AiBriefing({ symbols, symbolsReady, onBriefingLoaded }: AiBriefingProps) {
   const [data, setData] = useState<BriefingResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState("正在获取市场数据...");
 
   useEffect(() => {
+    // 等待 symbols 从 localStorage 确认后再发起昂贵的 AI 请求
+    if (!symbolsReady) return;
+
     if (symbols.length === 0) {
       setLoading(false);
       return;
@@ -46,7 +50,7 @@ export default function AiBriefing({ symbols, onBriefingLoaded }: AiBriefingProp
         setError("简报生成失败");
       })
       .finally(() => setLoading(false));
-  }, [symbols, onBriefingLoaded]);
+  }, [symbols, symbolsReady, onBriefingLoaded]);
 
   if (loading) {
     return (
@@ -89,9 +93,14 @@ export default function AiBriefing({ symbols, onBriefingLoaded }: AiBriefingProp
 
         <div className="mt-6 pt-4 border-t border-divider">
           <p className="text-xs text-ink-muted">
-            数据更新时间：{new Date(data.generatedAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
-            {" · "}
-            来源：Yahoo Finance / Marketaux / FMP / Finnhub
+            {"今日简报 · 生成于 "}
+            {new Date(data.generatedAt).toLocaleString("en-US", {
+              timeZone: "America/New_York",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })}
+            {" ET · 来源：Yahoo Finance / Marketaux / FMP / Finnhub"}
           </p>
         </div>
       </div>

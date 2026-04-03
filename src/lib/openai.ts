@@ -4,7 +4,7 @@ import { BriefingInput, ChatMessage } from "./types";
 function getClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
-  return new OpenAI({ apiKey });
+  return new OpenAI({ apiKey, baseURL: "https://api.openai.com/v1" });
 }
 
 /** AI 简报系统 prompt */
@@ -16,6 +16,7 @@ const BRIEFING_SYSTEM_PROMPT = `你是温先生的私人美股助理。请根据
 /** Chat 系统 prompt 模板 */
 const CHAT_SYSTEM_PROMPT = `你是温先生的私人美股助理。以下是今天的市场数据摘要，请基于这些数据回答温先生的问题。
 语气亲切但专业，称呼用「温先生」。回答简洁实用。不要使用 markdown 格式，输出纯文字。
+如果问题超出今日市场数据范围，直接告知温先生目前没有相关数据，建议查阅最新资讯，不要猜测或编造答案。
 
 今日市场数据：
 `;
@@ -62,12 +63,11 @@ export async function streamChat(
   const systemMessage = CHAT_SYSTEM_PROMPT + JSON.stringify(briefingContext, null, 2);
 
   return client.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4o-search-preview",
     messages: [
       { role: "system", content: systemMessage },
       ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
     ],
-    temperature: 0.7,
     max_tokens: 800,
     stream: true,
   });
