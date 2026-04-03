@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { fetchIndices } from "@/lib/yahoo-finance";
 import { fetchIndicesFMP } from "@/lib/fmp";
 import { fetchQuotes } from "@/lib/yahoo-finance";
@@ -9,27 +10,20 @@ import { fetchEarningsCalendar } from "@/lib/finnhub";
 import { getMarketStatus } from "@/lib/market-status";
 import { assembleBriefingInput } from "@/lib/briefing-pipeline";
 import { generateBriefing } from "@/lib/openai";
-export const revalidate = 43200; // 12 hours
+
+// NOTE: export const revalidate 在读取 request.searchParams 的动态路由上无效。
+// 改用 unstable_cache 在数据层缓存，绕过该限制。
 
 /**
- * GET /api/briefing?symbols=INTC,NVDA,GOOGL
- * 1. 并行获取所有数据源
- * 2. 组装结构化 BriefingInput
- * 3. 调用 GPT 生成中文简报
+ * 缓存简报生成结果，以 symbols key 为缓存键，12小时过期。
+ * 函数体执行时打印日志（缓存命中时不执行）。
  */
-export async function GET(request: NextRequest) {
-  const symbolsParam = request.nextUrl.searchParams.get("symbols") ?? "";
-  const symbols = symbolsParam.split(",").filter(Boolean).map((s) => s.trim().toUpperCase());
+const getCachedBriefing = unstable_cache(
+  async (symbolsKey: string) => {
+    console.log(`[Briefing] FRESH generation for: ${symbolsKey}`);
 
-  if (symbols.length === 0) {
-    return NextResponse.json({
-      data: null,
-      error: "请提供自选股列表",
-      updatedAt: new Date().toISOString(),
-    });
-  }
+    const symbols = symbolsKey.split(",");
 
-  try {
     const [indicesResult, quotesResult, analysts, news, earnings] = await Promise.all([
       fetchIndices().catch(() => fetchIndicesFMP().catch(() => null)),
       fetchQuotes(symbols).catch(() => fetchQuotesFMP(symbols).catch(() => [])),
@@ -54,18 +48,45 @@ export async function GET(request: NextRequest) {
     });
 
     const briefing = await generateBriefing(briefingInput);
+    const generatedAt = new Date().toISOString();
+
+    console.log(`[Briefing] Done — generated at ${generatedAt}`);
+
+    return { ...briefing, generatedAt, briefingInput };
+  },
+  ["briefing-v1"], // 缓存命名空间
+  { revalidate: 43200 } // 12小时
+);
+
+/**
+ * GET /api/briefing?symbols=INTC,NVDA,GOOGL
+ */
+export async function GET(request: NextRequest) {
+  const symbolsParam = request.nextUrl.searchParams.get("symbols") ?? "";
+  const symbols = symbolsParam.split(",").filter(Boolean).map((s) => s.trim().toUpperCase());
+
+  if (symbols.length === 0) {
+    return NextResponse.json({
+      data: null,
+      error: "请提供自选股列表",
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  // 对 symbols 排序，保证 [INTC,NVDA] 和 [NVDA,INTC] 命中同一缓存键
+  const symbolsKey = [...symbols].sort().join(",");
+
+  try {
+    const data = await getCachedBriefing(symbolsKey);
+    console.log(`[Briefing] Serving for ${symbolsKey}, generated at ${data.generatedAt}`);
 
     return NextResponse.json({
-      data: {
-        ...briefing,
-        generatedAt: new Date().toISOString(),
-        briefingInput,
-      },
+      data,
       error: null,
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Briefing generation failed:", error);
+    console.error("[Briefing] Failed:", error);
     return NextResponse.json(
       { data: null, error: "简报生成失败，请稍后重试", updatedAt: new Date().toISOString() },
       { status: 500 }
