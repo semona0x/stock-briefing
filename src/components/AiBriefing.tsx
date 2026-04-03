@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { BriefingData, BriefingInput, ApiResponse } from "@/lib/types";
 
 interface BriefingResponse extends BriefingData {
@@ -21,21 +21,76 @@ function formatCooldown(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")} 后可再次刷新`;
 }
 
-function formatBeijingTime(isoString: string): { date: string; time: string } {
-  const d = new Date(isoString);
-  const date = d.toLocaleDateString("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const time = d.toLocaleTimeString("zh-CN", {
+/** 将简报文本按行解析，返回带样式的 JSX 元素数组 */
+function renderBriefingLines(text: string): React.ReactNode[] {
+  const lines = text.split("\n");
+  const nodes: React.ReactNode[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // 空行 → 小间距
+    if (line.trim() === "") {
+      nodes.push(<div key={i} className="h-3" />);
+      continue;
+    }
+
+    // 【标签】格式 → 加粗节标题，上方留边距
+    if (/^【[^】]+】/.test(line)) {
+      nodes.push(
+        <p key={i} className="font-bold text-ink mt-4 first:mt-0">
+          {line}
+        </p>
+      );
+      continue;
+    }
+
+    // "关键词：" 结尾的行（如 "半导体："、"信息来源："）→ 缩进小标题
+    if (/^[\u4e00-\u9fa5A-Za-z&／/]+[：:]\s*$/.test(line.trim())) {
+      nodes.push(
+        <p key={i} className="font-semibold text-ink mt-2 pl-2 border-l-2 border-divider">
+          {line}
+        </p>
+      );
+      continue;
+    }
+
+    // "关键词：内容" 的行（如 "发生了什么：xxx"、"信息来源：Reuters"）→ 关键词加粗
+    const labelMatch = line.match(/^([\u4e00-\u9fa5A-Za-z&／/]+[：:])(.+)$/);
+    if (labelMatch) {
+      nodes.push(
+        <p key={i} className="mt-1 text-ink-light">
+          <span className="font-semibold text-ink">{labelMatch[1]}</span>
+          {labelMatch[2]}
+        </p>
+      );
+      continue;
+    }
+
+    // 普通段落
+    nodes.push(
+      <p key={i} className="mt-1 text-ink-light leading-relaxed">
+        {line}
+      </p>
+    );
+  }
+
+  return nodes;
+}
+
+function formatBeijingTime(isoString: string): string {
+  return new Date(isoString).toLocaleTimeString("zh-CN", {
     timeZone: "Asia/Shanghai",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
-  return { date, time };
+}
+
+/** "2026-04-02" → "4月2日" */
+function tradingDayLabel(dateStr: string): string {
+  const [, m, d] = dateStr.split("-");
+  return `${parseInt(m)}月${parseInt(d)}日`;
 }
 
 export default function AiBriefing({ symbols, symbolsReady, onBriefingLoaded }: AiBriefingProps) {
@@ -140,7 +195,8 @@ export default function AiBriefing({ symbols, symbolsReady, onBriefingLoaded }: 
     );
   }
 
-  const { date: bjDate, time: bjTime } = formatBeijingTime(data.generatedAt);
+  const bjTime = formatBeijingTime(data.generatedAt);
+  const dayLabel = tradingDayLabel(data.briefingInput.date);
 
   return (
     <section className="mt-8">
@@ -168,14 +224,14 @@ export default function AiBriefing({ symbols, symbolsReady, onBriefingLoaded }: 
         </p>
 
         {data.analysis && (
-          <p className="mt-4 text-ink-light leading-relaxed whitespace-pre-line">
-            {data.analysis}
-          </p>
+          <div className="mt-4">
+            {renderBriefingLines(data.analysis)}
+          </div>
         )}
 
         <div className="mt-6 pt-4 border-t border-divider">
           <p className="text-xs text-ink-muted">
-            {`本期简报基于 ${bjDate} 数据，生成于北京时间 ${bjTime}`}
+            {`本期简报基于 ${dayLabel} 收盘数据，生成于北京时间 ${bjTime}`}
           </p>
         </div>
       </div>

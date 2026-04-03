@@ -10,6 +10,7 @@ import { fetchEarningsCalendar } from "@/lib/finnhub";
 import { getMarketStatus } from "@/lib/market-status";
 import { assembleBriefingInput } from "@/lib/briefing-pipeline";
 import { generateBriefing } from "@/lib/openai";
+import { getLastTradingDay } from "@/lib/trading-day";
 
 // NOTE: export const revalidate 在读取 request.searchParams 的动态路由上无效。
 // 改用 unstable_cache 在数据层缓存，绕过该限制。
@@ -33,7 +34,7 @@ async function runGeneration(symbolsKey: string) {
     fetchEarningsCalendar(symbols).catch(() => []),
   ]);
 
-  const today = new Date().toISOString().split("T")[0];
+  const { date: today } = getLastTradingDay();
   const sessionState = getMarketStatus();
 
   const briefingInput = assembleBriefingInput({
@@ -86,9 +87,9 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const today = new Date().toISOString().split("T")[0];
-  // 包含日期的缓存键，保证每天自动失效
-  const symbolsKey = `${today}:${[...symbols].sort().join(",")}`;
+  const { date: tradingDay } = getLastTradingDay();
+  // 包含交易日日期的缓存键，保证每天自动失效
+  const symbolsKey = `${tradingDay}:${[...symbols].sort().join(",")}`;
 
   try {
     const data = force ? await runGeneration(symbolsKey) : await getCachedBriefing(symbolsKey);
