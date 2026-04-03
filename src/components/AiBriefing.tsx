@@ -196,7 +196,7 @@ export default function AiBriefing({ symbols, symbolsReady, onBriefingLoaded }: 
   }
 
   const bjTime = formatBeijingTime(data.generatedAt);
-  const dayLabel = tradingDayLabel(data.briefingInput.date);
+  const dayLabel = tradingDayLabel(data.briefingInput.market_summary.date);
 
   return (
     <section className="mt-8">
