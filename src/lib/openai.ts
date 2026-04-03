@@ -67,6 +67,7 @@ function cleanBriefing(raw: string): string {
     .replace(/^#+\s/gm, '')                        // 删除标题符号
     .replace(/^[-*]\s/gm, '')                      // 删除列表符号（- 和 * 开头）
     .replace(/`/g, '')                             // 删除代码符号
+    .replace(/^-{3,}.*$/gm, '')                    // 删除分隔线（--- xxx ---）
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')         // markdown 链接 → 保留文字
     .replace(/\([^)]*https?:\/\/[^)]*\)/g, '')      // 删除括号内裸 URL
     .replace(/https?:\/\/\S+/g, '')                 // 删除裸 URL
@@ -121,24 +122,24 @@ export async function generateBriefing(
   const stockSections = input.watchlist.map((stock) => {
     const name = COMPANY_NAMES[stock.symbol] ?? stock.symbol;
     const changePct = `${stock.change_pct >= 0 ? "+" : ""}${stock.change_pct.toFixed(2)}%`;
-    return `对 ${stock.symbol}（${name}），先执行以下搜索：
+    return `◆ ${stock.symbol}（${name}）分析指令：
+先执行以下搜索：
   "${stock.symbol} ${name} news today ${date}"
   "${stock.symbol} SEC filing announcement ${date}"
   "${stock.symbol} investor relations press release ${date}"
 优先查找公司层面具体事件（财报、并购、资产交易、高管变动、产品发布、重大合同、SEC filing、监管动作）。
 
-有公司层面具体事件时：
-【${stock.symbol}】一句话说今天为什么涨跌
+输出格式要求（必须严格遵守）：
+第一行必须是：【${stock.symbol}】<一句话总结今天为什么涨跌>
+不得省略【${stock.symbol}】标签，不得将其替换为其他格式。
+
+有公司层面具体事件时，第一行之后继续输出：
 信息来源：注明来源媒体
 发生了什么：具体事件描述
 为什么影响股价：从盈利预期、估值、资金流向解释因果
 短期还是长期：影响持续性
 
-未搜索到公司层面具体事件时：
-【${stock.symbol}】今日涨跌幅见上方价格，未搜索到当日公司层面重大事件。
-需进一步判断：该股更可能由宏观、板块或市场结构因素驱动。
-输出：
-一句话总结：今天为什么涨跌（必须给出判断，用"更可能由…"表达）
+未搜索到公司层面具体事件时，第一行之后继续输出：
 为什么影响股价：用"更可能由…"表达推断逻辑
 如果公开信息仍不足以确认驱动：写明"现有公开信息不足以确认单一驱动"，到此结束。
 不得编造公司事件。`;
@@ -198,6 +199,7 @@ ${stockSections}
   });
 
   const raw = completion.choices[0]?.message?.content ?? "";
+  console.log("RAW BRIEFING OUTPUT:", raw);
   const text = cleanBriefing(raw);
 
   // 第一段作为导语，其余作为正文

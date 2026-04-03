@@ -1,31 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { ChatMessage, BriefingInput } from "@/lib/types";
-import { STORAGE_KEY_CHAT } from "@/lib/constants";
 
 export function useChat(briefingContext: BriefingInput | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem(STORAGE_KEY_CHAT);
-      if (stored) {
-        setMessages(JSON.parse(stored));
-      }
-    } catch {
-      // 忽略
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(STORAGE_KEY_CHAT, JSON.stringify(messages));
-    } catch {
-      // 忽略
-    }
-  }, [messages]);
 
   const sendMessage = useCallback(
     async (content: string) => {
