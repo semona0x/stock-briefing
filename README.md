@@ -1,5 +1,19 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment Variables
+
+Set the following in `.env.local` (dev) and Vercel project settings (prod):
+
+| Variable | Description |
+|---|---|
+| `OPENAI_API_KEY` | OpenAI API key (gpt-4o-search-preview for briefing, gpt-4o for news translation) |
+| `FMP_API_KEY` | Financial Modeling Prep API key (analyst ratings, fallback quotes/indices) |
+| `MARKETAUX_API_KEY` | Marketaux API key (news feed) |
+| `FINNHUB_API_KEY` | Finnhub API key (earnings calendar) |
+| `CRON_SECRET` | Secret for Vercel Cron job auth — set to a random string, e.g. `ws9Kp2mXqL8nRvT4hJ6dYbF3cA5eZu7N` |
+
+The `CRON_SECRET` must match the `Authorization: Bearer <secret>` header that Vercel sends to `/api/cron/briefing` on the daily schedule (weekdays 21:00 UTC / 5:00 PM ET).
+
 ## Getting Started
 
 First, run the development server:

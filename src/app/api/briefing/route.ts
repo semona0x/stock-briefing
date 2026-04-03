@@ -15,59 +15,68 @@ import { generateBriefing } from "@/lib/openai";
 // 改用 unstable_cache 在数据层缓存，绕过该限制。
 
 /**
- * 缓存简报生成结果，以 symbols key 为缓存键，12小时过期。
- * 函数体执行时打印日志（缓存命中时不执行）。
+ * 核心生成逻辑（无缓存）。
+ * symbolsKey 格式：YYYY-MM-DD:SYM1,SYM2,SYM3（已排序）
  */
-const getCachedBriefing = unstable_cache(
-  async (symbolsKey: string) => {
-    console.log(`[Briefing] FRESH generation for: ${symbolsKey}`);
+async function runGeneration(symbolsKey: string) {
+  console.log(`[Briefing] FRESH generation for: ${symbolsKey}`);
 
-    const symbols = symbolsKey.split(",");
+  // key 格式: "2026-04-02:GOOGL,INTC,NVDA"
+  const colonIdx = symbolsKey.indexOf(":");
+  const symbols = symbolsKey.slice(colonIdx + 1).split(",");
 
-    const [indicesResult, quotesResult, analysts, news, earnings] = await Promise.all([
-      fetchIndices().catch(() => fetchIndicesFMP().catch(() => null)),
-      fetchQuotes(symbols).catch(() => fetchQuotesFMP(symbols).catch(() => [])),
-      fetchAnalystRatings(symbols).catch(() => []),
-      fetchNews(symbols).catch(() => []),
-      fetchEarningsCalendar(symbols).catch(() => []),
-    ]);
+  const [indicesResult, quotesResult, analysts, news, earnings] = await Promise.all([
+    fetchIndices().catch(() => fetchIndicesFMP().catch(() => null)),
+    fetchQuotes(symbols).catch(() => fetchQuotesFMP(symbols).catch(() => [])),
+    fetchAnalystRatings(symbols).catch(() => []),
+    fetchNews(symbols).catch(() => []),
+    fetchEarningsCalendar(symbols).catch(() => []),
+  ]);
 
-    const today = new Date().toISOString().split("T")[0];
-    const sessionState = getMarketStatus();
+  const today = new Date().toISOString().split("T")[0];
+  const sessionState = getMarketStatus();
 
-    const briefingInput = assembleBriefingInput({
-      date: today,
-      sessionState,
-      indices: indicesResult?.indices ?? [],
-      vix: indicesResult?.vix ?? { value: 0, level: "normal" },
-      treasury10y: indicesResult?.treasury10y ?? 0,
-      quotes: quotesResult ?? [],
-      analysts,
-      news,
-      earnings,
-    });
+  const briefingInput = assembleBriefingInput({
+    date: today,
+    sessionState,
+    indices: indicesResult?.indices ?? [],
+    vix: indicesResult?.vix ?? { value: 0, level: "normal" },
+    treasury10y: indicesResult?.treasury10y ?? 0,
+    quotes: quotesResult ?? [],
+    analysts,
+    news,
+    earnings,
+  });
 
-    const pricesText = (quotesResult ?? [])
-      .map((q) => `- ${q.symbol}：$${q.price.toFixed(2)}，今日涨跌：${q.changePct >= 0 ? "+" : ""}${q.changePct.toFixed(2)}%`)
-      .join("\n");
+  const pricesText = (quotesResult ?? [])
+    .map((q) => `- ${q.symbol}：$${q.price.toFixed(2)}，今日涨跌：${q.changePct >= 0 ? "+" : ""}${q.changePct.toFixed(2)}%`)
+    .join("\n");
 
-    const briefing = await generateBriefing(briefingInput, pricesText, today);
-    const generatedAt = new Date().toISOString();
+  const briefing = await generateBriefing(briefingInput, pricesText, today);
+  const generatedAt = new Date().toISOString();
 
-    console.log(`[Briefing] Done — generated at ${generatedAt}`);
+  console.log(`[Briefing] Done — generated at ${generatedAt}`);
 
-    return { ...briefing, generatedAt, briefingInput };
-  },
-  ["briefing-v1"], // 缓存命名空间
-  { revalidate: 43200 } // 12小时
+  return { ...briefing, generatedAt, briefingInput };
+}
+
+/**
+ * 缓存简报生成结果。缓存键包含日期，每天自动失效。
+ * 导出供 cron 路由预热缓存使用。
+ */
+export const getCachedBriefing = unstable_cache(
+  runGeneration,
+  ["briefing-v2"],
+  { revalidate: 43200 } // 12小时兜底
 );
 
 /**
- * GET /api/briefing?symbols=INTC,NVDA,GOOGL
+ * GET /api/briefing?symbols=INTC,NVDA,GOOGL[&force=true]
  */
 export async function GET(request: NextRequest) {
   const symbolsParam = request.nextUrl.searchParams.get("symbols") ?? "";
   const symbols = symbolsParam.split(",").filter(Boolean).map((s) => s.trim().toUpperCase());
+  const force = request.nextUrl.searchParams.get("force") === "true";
 
   if (symbols.length === 0) {
     return NextResponse.json({
@@ -77,11 +86,12 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // 对 symbols 排序，保证 [INTC,NVDA] 和 [NVDA,INTC] 命中同一缓存键
-  const symbolsKey = [...symbols].sort().join(",");
+  const today = new Date().toISOString().split("T")[0];
+  // 包含日期的缓存键，保证每天自动失效
+  const symbolsKey = `${today}:${[...symbols].sort().join(",")}`;
 
   try {
-    const data = await getCachedBriefing(symbolsKey);
+    const data = force ? await runGeneration(symbolsKey) : await getCachedBriefing(symbolsKey);
     console.log(`[Briefing] Serving for ${symbolsKey}, generated at ${data.generatedAt}`);
 
     return NextResponse.json({
