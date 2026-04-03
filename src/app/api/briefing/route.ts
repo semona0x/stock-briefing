@@ -47,7 +47,11 @@ const getCachedBriefing = unstable_cache(
       earnings,
     });
 
-    const briefing = await generateBriefing(briefingInput);
+    const pricesText = (quotesResult ?? [])
+      .map((q) => `- ${q.symbol}：$${q.price.toFixed(2)}，今日涨跌：${q.changePct >= 0 ? "+" : ""}${q.changePct.toFixed(2)}%`)
+      .join("\n");
+
+    const briefing = await generateBriefing(briefingInput, pricesText, today);
     const generatedAt = new Date().toISOString();
 
     console.log(`[Briefing] Done — generated at ${generatedAt}`);
