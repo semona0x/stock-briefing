@@ -11,8 +11,10 @@ function getClient(): OpenAI {
 const BRIEFING_SYSTEM_PROMPT = `你是温先生的私人美股助理，具备交易员级别的市场理解能力。
 温先生人在中国，不看英文，依赖你提供准确的中文市场简报。
 
-核心原则：准确归因，不编造。每一条事实判断必须基于你实际
-搜索到的来源。找不到就说找不到，编造是唯一不可接受的行为。
+核心原则：准确归因，不编造。所有事件类事实必须基于你实际搜索到的来源。
+允许基于这些事实进行市场推理（如宏观、板块、资金行为），
+但必须明确使用"更可能""主要由…驱动"等表达，
+不得将推断写成已确认事实。
 
 价格数据以prompt中提供的Yahoo Finance数据为准，不得自行搜索
 或引用价格。
@@ -68,13 +70,13 @@ function cleanBriefing(raw: string): string {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')         // markdown 链接 → 保留文字
     .replace(/\([^)]*https?:\/\/[^)]*\)/g, '')      // 删除括号内裸 URL
     .replace(/https?:\/\/\S+/g, '')                 // 删除裸 URL
-    .replace(/\*\s+/g, '')                          // 删除孤立星号加空格
+    .replace(/^\*\s+/gm, '')                        // 删除行首孤立星号（list marker）
+    .replace(/\([a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\)/g, '') // 删除括号内域名
     .replace(/以上是今日的市场简报。?/g, '')           // 删除结尾语
     .replace(/温先生，以下是[^。]*。?/g, '')          // 删除开头问候语
     .replace(/今日无显著动态。?/g, '')               // 删除占位语
     .replace(/暂无相关消息。?/g, '')
     .replace(/今天没有[^。]*动态。?/g, '')
-    .replace(/【[^】]+】\s*\n?\s*\n/g, '\n')       // 删除后面没有内容的空标签
     .replace(/\n{3,}/g, '\n\n')                    // 合并多余空行
     .trim();
 }
@@ -86,12 +88,61 @@ function cleanBriefing(raw: string): string {
  * @param date 今日日期，如 "2026-04-02"
  * 返回 { headline, analysis }
  */
+// 常见股票中英文名称映射，用于搜索词质量
+const COMPANY_NAMES: Record<string, string> = {
+  INTC: "Intel",
+  NVDA: "Nvidia",
+  GOOGL: "Alphabet Google",
+  GOOG: "Alphabet Google",
+  MSFT: "Microsoft",
+  AAPL: "Apple",
+  AMZN: "Amazon",
+  META: "Meta",
+  TSLA: "Tesla",
+  AMD: "AMD",
+  QCOM: "Qualcomm",
+  AVGO: "Broadcom",
+  TSM: "TSMC",
+  ASML: "ASML",
+  MU: "Micron",
+  AMAT: "Applied Materials",
+  ORCL: "Oracle",
+  CRM: "Salesforce",
+};
+
 export async function generateBriefing(
   input: BriefingInput,
   pricesText: string,
   date: string
 ): Promise<{ headline: string; analysis: string }> {
   const client = getClient();
+
+  // Build per-stock search + format instructions with real symbol/name/change
+  const stockSections = input.watchlist.map((stock) => {
+    const name = COMPANY_NAMES[stock.symbol] ?? stock.symbol;
+    const changePct = `${stock.change_pct >= 0 ? "+" : ""}${stock.change_pct.toFixed(2)}%`;
+    return `对 ${stock.symbol}（${name}），先执行以下搜索：
+  "${stock.symbol} ${name} news today ${date}"
+  "${stock.symbol} SEC filing announcement ${date}"
+  "${stock.symbol} investor relations press release ${date}"
+优先查找公司层面具体事件（财报、并购、资产交易、高管变动、产品发布、重大合同、SEC filing、监管动作）。
+
+有公司层面具体事件时：
+【${stock.symbol}】一句话说今天为什么涨跌
+信息来源：注明来源媒体
+发生了什么：具体事件描述
+为什么影响股价：从盈利预期、估值、资金流向解释因果
+短期还是长期：影响持续性
+
+未搜索到公司层面具体事件时：
+【${stock.symbol}】今日涨跌幅见上方价格，未搜索到当日公司层面重大事件。
+需进一步判断：该股更可能由宏观、板块或市场结构因素驱动。
+输出：
+一句话总结：今天为什么涨跌（必须给出判断，用"更可能由…"表达）
+为什么影响股价：用"更可能由…"表达推断逻辑
+如果公开信息仍不足以确认驱动：写明"现有公开信息不足以确认单一驱动"，到此结束。
+不得编造公司事件。`;
+  }).join("\n\n");
 
   const userMessage = `今天日期：${date}
 
@@ -103,7 +154,11 @@ ${pricesText}
 第一部分 大盘与科技板块
 
 【今日大盘】
-一到两句话说清今天美股整体方向和最主要原因。注明来源（如"据Reuters报道"）。
+必须说明：
+今天属于平稳、波动、冲击哪一类
+盘中是否出现明显上涨或下跌
+收盘是否出现修复或延续
+然后用一到两句话总结最主要原因，并注明来源。
 
 【科技板块】
 以下四个方面，有实质内容才写，没有就跳过该方面，不要写占位语：
@@ -125,28 +180,7 @@ AI与云计算：当日重要动态
 
 第三部分 自选股逐只分析
 
-对每只股票，先执行以下搜索：
-  "[symbol] [companyName] news today ${date}"
-  "[symbol] SEC filing announcement ${date}"
-  "[symbol] investor relations press release ${date}"
-优先查找公司层面具体事件（财报、并购、资产交易、高管变动、产品发布、重大合同、SEC filing、监管动作）。
-
-然后根据搜索结果选择对应格式：
-
-有公司层面具体事件时：
-
-【[symbol]】一句话说今天为什么涨跌
-信息来源：（注明来源媒体，如Reuters、公司IR页面）
-发生了什么：具体事件描述
-为什么影响股价：从盈利预期、估值、资金流向中选最相关角度解释因果
-短期还是长期：这个影响的持续性
-
-未搜索到公司层面具体事件时：
-
-【[symbol]】今日[changePercent]，未搜索到当日公司层面重大事件，股价变动主要跟随大盘/板块走势。
-
-到此结束，不要展开分析，不要猜测原因。
-
+${stockSections}
 
 总体要求：
 全程中文

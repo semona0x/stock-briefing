@@ -35,7 +35,17 @@ function renderBriefingLines(text: string): React.ReactNode[] {
       continue;
     }
 
-    // 【标签】格式 → 加粗节标题，上方留边距
+    // 第X部分 → 大节标题，更明显的分隔
+    if (/^第[一二三四五六七八九十]+部分/.test(line)) {
+      nodes.push(
+        <p key={i} className="font-bold text-ink text-base mt-6 first:mt-0 border-b border-divider pb-1">
+          {line}
+        </p>
+      );
+      continue;
+    }
+
+    // 【标签】格式（含股票代码）→ 加粗节标题，上方留边距
     if (/^【[^】]+】/.test(line)) {
       nodes.push(
         <p key={i} className="font-bold text-ink mt-4 first:mt-0">

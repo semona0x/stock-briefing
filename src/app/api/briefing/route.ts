@@ -67,7 +67,7 @@ async function runGeneration(symbolsKey: string) {
  */
 export const getCachedBriefing = unstable_cache(
   runGeneration,
-  ["briefing-v2"],
+  ["briefing-v3"],
   { revalidate: 43200 } // 12小时兜底
 );
 
